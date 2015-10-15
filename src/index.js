@@ -1,25 +1,10 @@
-import GameRunner from 'no-thanks-runner';
+  import GameRunner from 'no-thanks-runner';
 import predictors from './predictors';
 
 const runnerConfig = {
   reportEveryTurn: false, 
-  reportAfter: false
+  reportAfter: true
 };
-
-function learningRule(weights, reinforcementSignal, predictions, chosen, gameState) {
-  const newWeights = [];
-  
-  const choiceResult = predictions.reduce((sum, prediction) => {
-    return (prediction.action == chosen ? prediction.value : 0);
-  }, 0);
-
-  weights.forEach((feature, index) => {
-    newWeights[index] = feature + choiceResult * reinforcementSignal;
-    // console.log("\t", index, ": ", newWeights[index], ' = ', feature, '+', choiceResult, '*', reinforcementSignal);
-  });
-  // console.log('Learning Rule! => From', weights, 'To', newWeights);
-  return newWeights;
-}
 
 function chooseRandomPlayers(learner) {
   const numPlayers = parseInt(Math.random() * 3) + 2;
@@ -36,22 +21,14 @@ function shouldContinue(gameCount) {
 
 function learn() {
 
-  const config = {
-    bias: Math.random(),
-    static: false
-  };
-
-  // const learner = predictors.reinforcement.build(config, learningRule);
-  const learner = predictors.random.build(config, learningRule);
+  const learner = predictors.reinforcement.build();
 
   let gameCount = 0;
   while(shouldContinue(gameCount++)) {
     const players = chooseRandomPlayers(learner);
     const gameResult = GameRunner.play(players, runnerConfig);
-    console.log('after game', gameCount, config);
+    console.log(gameResult);
   }
-
-  console.log('======\n\n', config);
 
 }
 

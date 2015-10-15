@@ -1,10 +1,3 @@
-function calculateReinforcementSignal(gameState) {
-  return Math.random();
-}
-
-function getWeights(config) {
-  return [config.bias];
-}
 
 function normalizePredictedValues(actions) {
   const sum = actions.reduce((sum, action) => (sum + action.value), 0);
@@ -15,29 +8,28 @@ export default {
   build(config, learningRule) {
     const takeOdds = config.bias || 0;
     return {
-      predict(gameState, legalActions) {
-        const ret = [];
-        legalActions.forEach((action) => {
-          switch(action) {
+      id: config.id,
+      config,
+      predict(gameState, options) {
+        options.forEach((option) => {
+          switch(option.action) {
             case 'take':
-              ret.push({action, value: 1});
+              option.value = 1;
               break;
             case 'noThanks':
-              ret.push({action, value: Math.random() / 50 * takeOdds});
+              option.value = Math.random() * takeOdds * 2;
               break;
           }
         });
 
-        normalizePredictedValues(ret);
+        normalizePredictedValues(options);
 
-        return ret;
+        return options;
       },
 
       update(predictions, chosen, gameState) {
         if(!config.static) {
-          const reinforcementSignal = calculateReinforcementSignal(gameState);
-          const weights = learningRule(getWeights(config), reinforcementSignal, predictions, chosen, gameState);
-          config.bias = weights[0];
+          config.bias = config.bias + .01 * Math.random() - .005;
         }
       }
     }
