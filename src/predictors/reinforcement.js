@@ -1,29 +1,34 @@
-// Features describing the current game state, each feature will have a value [0,1]. 
+  // Features describing the current game state, each feature's value is either 0 or 1.
 function calculateFeatures(id, gameState) {
-  const features = [];
-
-  // Cards left in deck
-  // features.push(gameState.deck.length);
+  const features = [1];
 
   // Pot size greater than x
-  for(let potSize = 0 ; potSize < 30 ; potSize += 3) {
-    features.push(gameState.table.pot >= potSize ? 1 : 0);
-  }
+  [7, 15].forEach((potSize) => {
+    features.push(gameState.table.pot > potSize ? 1 : 0);
+  });
 
-  // // Players sorted by current player, score asc
-  const currentPlayer = gameState.players.list.find((player) => player.id == id);
-  const otherPlayers = [];
-  // const otherPlayers = gameState.players.list
-  //   .filter(...)
-  //   .sort((a,b) => b.score - a.score);
+  // Players sorted by current player, score asc
+  const players = gameState.players.list
+    .slice(0)
+    .sort((a,b) => {
+      if(a.id === id) {
+        return -1;
+      } else if(b.id === id) {
+        return 1;
+      } else {
+        return b.score - a.score;
+      }
+    });
 
   // // Money, card net value for each player
-  [currentPlayer, ...otherPlayers].forEach((player) => {
-      for(let netValue = 0 ; netValue < 30 ; netValue += 3) {
-        features.push(
-          cardNetValue(gameState.deck[0], player.cards, gameState.table.pot) >= netValue ? 1 : 0
-        );
-      }
+  players.forEach((player) => {
+    [8, 15].forEach((netValue) => {
+      const playerNetValue = cardNetValue(gameState.deck[0], player.cards, gameState.table.pot);
+      features.push(playerNetValue > netValue ? 1 : 0);
+    });
+    [3, 7].forEach((money) => {
+      features.push(player.money > money ? 1 : 0);
+    });
   });
 
   return features;
@@ -31,7 +36,7 @@ function calculateFeatures(id, gameState) {
 }
 
 // Weights start at random [-1, 1]
-function getWeights(weights, featureCount) {
+function ensureWeights(weights, featureCount) {
   while(weights.length < featureCount) {
     weights.push(Math.random() * 2 - 1);
   }
@@ -42,20 +47,22 @@ function sumFeatureWeights(features, weights) {
   const sum = features.reduce((sum, feature, index) => {
     return sum + feature * weights[index];
   }, 0);
+
   return sum;
 }
 
-// Step function
+// Sigmoid smoothing
 function kernel(value) {
-  return Math.floor(value, 1.0000);
+  const ret = 1/(1+Math.pow(Math.E, -1 * value));
+  return ret;
 }
 
-
-function updateWeights(weights, features, scaledOdds, reinforcementSignal) {
-  // console.log('Updating weights, successMeasure: ' + scaledOdds + ', RS: ' + reinforcementSignal);
+function updateWeights(weights, features, choiceScalar, reinforcementSignal) {
   weights.forEach((weight, index) => { 
-    // console.log('Feature #' + index + ': ' + features[index] + ' * ' + weight + ' => ' + weight + scaledOdds * reinforcementSignal);
-    weights[index] = (weight + features[index] * scaledOdds * reinforcementSignal) * .98;
+    if(index > 0) {
+      const newWeight = (weight + features[index] * choiceScalar * reinforcementSignal) * .98;
+      weights[index] = newWeight;
+    }
   });
 }
 
@@ -67,19 +74,16 @@ function calculateReinforcementSignal(id, gameState) {
   , 999);
   
   const multipler = gameState.game.state === 'gameover' 
-    ? (usScore < bestOtherScore ? .01 : 100) 
-    : 1;
-
-  // console.log('score', usScore, '\n', JSON.stringify(gameState.players.list.find((player) => player.id == id)));
+    ? (usScore < bestOtherScore ? .001 : 10000) 
+    : .01;
 
   const rs = multipler * usScore;
 
   return rs;
 }
 
-function normalizePredictedValues(actions) {
-  const sum = actions.reduce((sum, action) => sum + action.value, 0);
-  actions.forEach((action) => action.value /= sum);
+function sortByValue(a,b) {
+  return b.value - a.value;
 }
 
 function cardNetValue(card, cards, pot) {
@@ -98,45 +102,54 @@ export default {
   build(config, learningRule) {
     return {
 
-      id: 'Reinforcement Guy!',
+      id: config.id || 'Reinforcement Player!',
 
       config,
 
-      weights: [],
+      weights: [.1], // Constant initial weight
 
-      predict(gameState, options) {
+      predict(gameState, actions) {
         const ret = [];
         const features = calculateFeatures(this.id, gameState);
-        const value = kernel(sumFeatureWeights(features, getWeights(this.weights, features.length)));
+        const sumFW = sumFeatureWeights(features, ensureWeights(this.weights, features.length));
+        const value = kernel(sumFW);
 
-        options.forEach((option) => {
-          switch(option.action) {
+        actions.forEach((action) => {
+          switch(action) {
             case 'take':
-              option.value = value;
+              ret.push({action, value});
               break;
             case 'noThanks':
-              option.value = .5;
+              ret.push({action, value: .5});
               break;
           }
         });
 
-        normalizePredictedValues(options);
+        ret.sort(sortByValue);
 
-        // console.log('Prediction complete', value, options.map((option) => option.action + ' (' + option.value + ')'));
+        if(config.verbose) {
+          console.log('Predict()', sumFW, value, JSON.stringify(ret));
+        }
 
-        return options;
+        return ret;
       },
 
       update(predictions, chosen, gameState, nextGameState) {
 
+        const chosenPrediction = predictions.find((prediction) => prediction.action === chosen);
+
         const weights = this.weights;
         const features = calculateFeatures(this.id, gameState);
 
-        const scaledOdds = 1 - predictions.find((prediction) => prediction.action == chosen).value;
-        const reinforcementSignal = calculateReinforcementSignal(this.id, gameState);
+        const choiceScalar = (chosenPrediction.action === 'take' ? -1 : 1) * chosenPrediction.value;
         const nextReinforcementSignal = calculateReinforcementSignal(this.id, nextGameState);
 
-        updateWeights(weights, features, scaledOdds, nextReinforcementSignal - reinforcementSignal);
+        if(config.verbose) {
+          console.log('Update()', choiceScalar, nextReinforcementSignal);
+        }
+
+        updateWeights(weights, features, choiceScalar, nextReinforcementSignal);
+
       },
 
       toString() {

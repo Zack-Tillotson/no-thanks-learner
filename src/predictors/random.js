@@ -1,7 +1,5 @@
-
-function normalizePredictedValues(actions) {
-  const sum = actions.reduce((sum, action) => (sum + action.value), 0);
-  actions.forEach((action) => action.value /= sum);
+function sortByValue(a,b) {
+  return b.value - a.value;
 }
 
 export default {
@@ -10,21 +8,23 @@ export default {
     return {
       id: config.id,
       config,
-      predict(gameState, options) {
-        options.forEach((option) => {
-          switch(option.action) {
+      predict(gameState, actions) {
+        const ret = [];
+        for(var i = 0 ; i < actions.length ; i++) {
+          var action = actions[i];
+          switch(action) {
             case 'take':
-              option.value = 1;
+              ret.push({action: action, value: .5});
               break;
             case 'noThanks':
-              option.value = Math.random() * takeOdds * 2;
+              ret.push({action: action, value: Math.random() < takeOdds ? 0 : 1});
               break;
           }
-        });
+        };
 
-        normalizePredictedValues(options);
+        ret.sort(sortByValue);
 
-        return options;
+        return ret;
       },
 
       update(predictions, chosen, gameState) {

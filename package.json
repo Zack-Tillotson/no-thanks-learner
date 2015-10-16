@@ -16,7 +16,7 @@
     "array.prototype.find": "^1.0.0",
     "babel-core": "^5.8.25",
     "babel-loader": "^5.3.2",
-    "no-thanks-runner": "^0.1.5",
+    "no-thanks-runner": "^0.2.0",
     "object-assign": "^4.0.1",
     "uuid": "^2.0.1",
     "webpack": "^1.12.2"

@@ -12,9 +12,8 @@ function currentCardValue(gameState) {
   return -1 * gameState.table.pot + (cardGetsCovered(gameState) ? 0 : gameState.deck[0]);  
 }
 
-function normalizePredictedValues(actions) {
-  const sum = actions.reduce((sum, action) => (sum + action.value), 0);
-  actions.forEach((action) => action.value /= sum);
+function sortByValue(a,b) {
+  return b.value - a.value;
 }
 
 export default {
@@ -23,23 +22,23 @@ export default {
     return {
       id: config.id || 'Net Value ' + threshold,
       config,
-      predict(gameState, options) {
+      predict(gameState, actions) {
         const ret = [];
         const cardValue = currentCardValue(gameState);
-        options.forEach((option) => {
-          switch(option.action) {
+        actions.forEach((action) => {
+          switch(action) {
             case 'take':
-              option.value = 1;
+              ret.push({action, value: 1});
               break;
             case 'noThanks':
-              option.value = cardValue < threshold ? 2 : 0;
+              ret.push({action, value: cardValue > threshold ? 2 : 0});
               break;
           }
         });
 
-        normalizePredictedValues(options);
+        ret.sort(sortByValue);
 
-        return options;
+        return ret;
       },
 
       update(predictions, chosen, gameState) {
