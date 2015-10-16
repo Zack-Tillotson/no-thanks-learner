@@ -3,7 +3,7 @@ function calculateFeatures(id, gameState) {
   const features = [1];
 
   // Pot size greater than x
-  [7, 15].forEach((potSize) => {
+  [3, 7, 10, 15, 20].forEach((potSize) => {
     features.push(gameState.table.pot > potSize ? 1 : 0);
   });
 
@@ -22,11 +22,11 @@ function calculateFeatures(id, gameState) {
 
   // // Money, card net value for each player
   players.forEach((player) => {
-    [8, 15].forEach((netValue) => {
+    [-15, -10, -5, 0, 5, 10, 15, 20].forEach((netValue) => {
       const playerNetValue = cardNetValue(gameState.deck[0], player.cards, gameState.table.pot);
       features.push(playerNetValue > netValue ? 1 : 0);
     });
-    [3, 7].forEach((money) => {
+    [3, 5, 7, 9, 13].forEach((money) => {
       features.push(player.money > money ? 1 : 0);
     });
   });
