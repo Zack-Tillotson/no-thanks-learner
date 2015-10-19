@@ -3,9 +3,10 @@ function calculateFeatures(id, gameState) {
   const features = [1];
 
   // Pot size greater than x
-  [3, 7, 10, 15, 20].forEach((potSize) => {
-    features.push(gameState.table.pot > potSize ? 1 : 0);
-  });
+  // [3, 7, 10, 15, 20].forEach((potSize) => {
+  //   features.push(gameState.table.pot > potSize ? 1 : 0);
+  // });
+  features.push(gameState.table.pot);
 
   // Players sorted by current player, score asc
   const players = gameState.players.list
@@ -22,13 +23,15 @@ function calculateFeatures(id, gameState) {
 
   // // Money, card net value for each player
   players.forEach((player) => {
-    [-15, -10, -5, 0, 5, 10, 15, 20].forEach((netValue) => {
-      const playerNetValue = cardNetValue(gameState.deck[0], player.cards, gameState.table.pot);
-      features.push(playerNetValue > netValue ? 1 : 0);
-    });
-    [3, 5, 7, 9, 13].forEach((money) => {
-      features.push(player.money > money ? 1 : 0);
-    });
+    const playerNetValue = cardNetValue(gameState.deck[0], player.cards, gameState.table.pot);
+    // [-10, 0, 10, 20].forEach((netValue) => {
+    //   features.push(playerNetValue < netValue ? 1 : 0);
+    // });
+    // [1, 3, 7, 13].forEach((money) => {
+    //   features.push(player.money < money ? 1 : 0);
+    // });
+    features.push(playerNetValue);
+    features.push(player.money);
   });
 
   return features;
@@ -74,7 +77,7 @@ function calculateReinforcementSignal(id, gameState) {
   , 999);
   
   const multipler = gameState.game.state === 'gameover' 
-    ? (usScore < bestOtherScore ? .001 : 10000) 
+    ? (usScore < bestOtherScore ? .001 : 1) 
     : .01;
 
   const rs = multipler * usScore;
@@ -142,13 +145,15 @@ export default {
         const features = calculateFeatures(this.id, gameState);
 
         const choiceScalar = (chosenPrediction.action === 'take' ? -1 : 1) * chosenPrediction.value;
+
+        const prevReinforcementSignal = calculateReinforcementSignal(this.id, gameState);
         const nextReinforcementSignal = calculateReinforcementSignal(this.id, nextGameState);
 
         if(config.verbose) {
-          console.log('Update()', choiceScalar, nextReinforcementSignal);
+          console.log('Update()', choiceScalar, prevReinforcementSignal, nextReinforcementSignal);
         }
 
-        updateWeights(weights, features, choiceScalar, nextReinforcementSignal);
+        updateWeights(weights, features, choiceScalar, nextReinforcementSignal - prevReinforcementSignal);
 
       },
 

@@ -5,8 +5,11 @@ function chooseRandomPlayers(learner) {
   const numPlayers = 4;//parseInt(Math.random() * 3) + 2;
   const players = [learner];
   for(let i = 1; i < numPlayers ; i++) {
-    //players.push(predictors.random.build({bias: .33, static: true, id: 'Random ' + i}));
-    players.push(predictors.netvalue.build({threshold: 10, static: true, id: 'Net Value ' + i}));
+    if(Math.random() > .5) {
+      players.push(predictors.random.build({bias: .25, static: true, id: 'Random ' + i}));
+    } else {
+      players.push(predictors.netvalue.build({threshold: 10, static: true, id: 'Net Value ' + i}));
+    }
   }
   return players;
 }
@@ -17,48 +20,58 @@ function niceNumber(num) {
 
 function learn() {
 
+  const generalConfig = {
+    id: 'Learner'
+  }
 
-  const TRAINING_GAME_COUNT = 1000;
-  const EVALUATION_GAME_COUNT = 100;
-  const LEARNER_ID = 'Learner';
+  const trainingConfig = {
+    gameCount: 100000,
+    reportEveryTurn: false,
+    reportAfter: false
+  };
 
-  const learner = predictors.reinforcement.build({id: LEARNER_ID});
-  //const learner = predictors.random.build({bias: 0, static: true, id: LEARNER_ID});
-  //const learner = predictors.netvalue.build({threshold: 10, static: true, id: LEARNER_ID});
+  const evaluationConfig = {
+    gameCount: 1000,
+    reportEveryTurn: false,
+    reportAfter: true
+  };
 
-  console.log('Training stage: ' + TRAINING_GAME_COUNT + ' games');
+  const learner = predictors.reinforcement.build({id: generalConfig.id});
+  //const learner = predictors.random.build({bias: 0, static: true, id: generalConfig.id});
+  //const learner = predictors.netvalue.build({threshold: 10, static: true, id: generalConfig.id});
+
+  console.log('Training stage: ' + trainingConfig.gameCount + ' games');
 
   let gameCount = 0;
-  while(gameCount < TRAINING_GAME_COUNT) {
+  while(gameCount < trainingConfig.gameCount) {
     
     const players = chooseRandomPlayers(learner);
-    GameRunner.play(players, {
-      reportEveryTurn: false, 
-      reportAfter: false
-    });
+    GameRunner.play(players, trainingConfig);
 
     gameCount++;
+
+    if(gameCount % 1000 === 0) {
+      console.log(100*niceNumber(gameCount/trainingConfig.gameCount) + '%');
+    } 
+
   }
 
   console.log('Training stage complete\n');
-  console.log('Evaluation stage: ' + EVALUATION_GAME_COUNT + ' games');
+  console.log('Evaluation stage: ' + evaluationConfig.gameCount + ' games');
 
   learner.config.verbose = false;
 
   gameCount = 0;
   let gamesWon = 0, avgPos = 0, gameResult;
-  while(gameCount < EVALUATION_GAME_COUNT) {
+  while(gameCount < evaluationConfig.gameCount) {
     
     const players = chooseRandomPlayers(learner);
-    gameResult = GameRunner.play(players, {
-      reportEveryTurn: false, 
-      reportAfter: false
-    });
+    gameResult = GameRunner.play(players, evaluationConfig);
 
-    gameResult.players.list.sort(function(a,b) { return b.score - a.score});
+    gameResult.players.list.sort(function(a,b) { return a.score - b.score});
     let position = gameResult.players.list.length;
     gameResult.players.list.forEach((player, index) => {
-      if(player.id == LEARNER_ID) position = index;
+      if(player.id == generalConfig.id) position = index;
     });
     
     gameCount++;
